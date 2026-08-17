@@ -21,6 +21,8 @@ defaults = {
     "relacion": None,
     "factor_a": None,
     "factor_b": None,
+    "factor_a_guardado": None,
+    "factor_b_guardado": None,
     "anticipacion_guardada": False,
     "comprobacion": None,
     "registro": []
@@ -51,6 +53,8 @@ def nueva_exploracion():
     st.session_state.relacion = None
     st.session_state.factor_a = None
     st.session_state.factor_b = None
+    st.session_state.factor_a_guardado = None
+    st.session_state.factor_b_guardado = None
     st.session_state.anticipacion_guardada = False
     st.session_state.comprobacion = None
 
@@ -64,10 +68,13 @@ def guardar_anticipacion():
         st.session_state.factor_a is not None
         and st.session_state.factor_b is not None
     ):
+        # Conservamos la anticipación antes del rerun
+        st.session_state.factor_a_guardado = st.session_state.factor_a
+        st.session_state.factor_b_guardado = st.session_state.factor_b
+
         st.session_state.anticipacion_guardada = True
         st.session_state.comprobacion = None
         st.session_state.ultima_celda_evento = None
-
 
 def guardar_resultado():
     inicial = st.session_state.producto_inicial
@@ -373,8 +380,8 @@ if st.session_state.anticipacion_guardada:
     f0, c0 = st.session_state.producto_inicial
     producto0 = f0 * c0
 
-    a = st.session_state.factor_a
-    b = st.session_state.factor_b
+    a = st.session_state.factor_a_guardado
+    b = st.session_state.factor_b_guardado
 
     anticipado = a * b
 
