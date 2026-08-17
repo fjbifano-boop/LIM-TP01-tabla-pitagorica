@@ -16,11 +16,14 @@ st.set_page_config(
 # =========================================================
 
 defaults = {
-    "celdas_elegidas": [],
+    "producto_inicial": None,
     "ultima_celda_evento": None,
-    "registro_exploracion": [],
-    "observacion_actual": "",
-    "orientacion": "Exploración libre",
+    "relacion": None,
+    "factor_a": None,
+    "factor_b": None,
+    "anticipacion_guardada": False,
+    "comprobacion": None,
+    "registro": []
 }
 
 for clave, valor in defaults.items():
@@ -37,59 +40,55 @@ def crear_tabla():
         str(columna): [fila * columna for fila in range(1, 11)]
         for columna in range(1, 11)
     }
-
     df = pd.DataFrame(datos, index=range(1, 11))
     df.index.name = "×"
     return df
 
 
-def limpiar_seleccion():
-    st.session_state.celdas_elegidas = []
+def nueva_exploracion():
+    st.session_state.producto_inicial = None
     st.session_state.ultima_celda_evento = None
-    st.session_state.observacion_actual = ""
+    st.session_state.relacion = None
+    st.session_state.factor_a = None
+    st.session_state.factor_b = None
+    st.session_state.anticipacion_guardada = False
+    st.session_state.comprobacion = None
 
 
-def guardar_observacion():
-    texto = st.session_state.observacion_actual.strip()
-
-    if len(st.session_state.celdas_elegidas) == 2 and texto:
-        (f1, c1), (f2, c2) = st.session_state.celdas_elegidas
-
-        st.session_state.registro_exploracion.append({
-            "celda1": (f1, c1),
-            "celda2": (f2, c2),
-            "producto1": f1 * c1,
-            "producto2": f2 * c2,
-            "observacion": texto,
-            "orientacion": st.session_state.orientacion
-        })
-
-        limpiar_seleccion()
+def cambiar_producto():
+    nueva_exploracion()
 
 
-def volver_a_caso(indice):
-    registro = st.session_state.registro_exploracion[indice]
-
-    st.session_state.celdas_elegidas = [
-        registro["celda1"],
-        registro["celda2"]
-    ]
-
-    st.session_state.observacion_actual = registro["observacion"]
-    st.session_state.ultima_celda_evento = None
+def guardar_anticipacion():
+    if (
+        st.session_state.factor_a is not None
+        and st.session_state.factor_b is not None
+    ):
+        st.session_state.anticipacion_guardada = True
+        st.session_state.comprobacion = None
+        st.session_state.ultima_celda_evento = None
 
 
-def borrar_registro(indice):
-    st.session_state.registro_exploracion.pop(indice)
-    limpiar_seleccion()
+def guardar_resultado():
+    inicial = st.session_state.producto_inicial
+
+    registro = {
+        "inicial": inicial,
+        "relacion": st.session_state.relacion,
+        "anticipacion": (
+            st.session_state.factor_a,
+            st.session_state.factor_b
+        ),
+        "comprobacion": st.session_state.comprobacion
+    }
+
+    st.session_state.registro.append(registro)
+    nueva_exploracion()
 
 
 def reiniciar():
-    st.session_state.celdas_elegidas = []
-    st.session_state.ultima_celda_evento = None
-    st.session_state.registro_exploracion = []
-    st.session_state.observacion_actual = ""
-    st.session_state.orientacion = "Exploración libre"
+    st.session_state.registro = []
+    nueva_exploracion()
 
 
 def estilizar_tabla(df, celdas):
@@ -99,21 +98,30 @@ def estilizar_tabla(df, celdas):
         columns=df.columns
     )
 
-    for fila, columna in celdas:
+    for fila, columna, tipo in celdas:
         columna = str(columna)
 
         if fila in estilos.index and columna in estilos.columns:
-            estilos.loc[fila, columna] = (
-                "background-color:#2563eb;"
-                "color:white;"
-                "font-weight:800;"
-            )
+
+            if tipo == "inicial":
+                estilos.loc[fila, columna] = (
+                    "background-color:#2563eb;"
+                    "color:white;"
+                    "font-weight:800;"
+                )
+
+            elif tipo == "comprobacion":
+                estilos.loc[fila, columna] = (
+                    "background-color:#16a34a;"
+                    "color:white;"
+                    "font-weight:800;"
+                )
 
     return df.style.apply(lambda _: estilos, axis=None)
 
 
 # =========================================================
-# DATOS
+# TABLA
 # =========================================================
 
 tabla = crear_tabla()
@@ -125,13 +133,12 @@ tabla = crear_tabla()
 
 st.caption("LIM · Laboratorio de Ideas Matemáticas · TP-01")
 
-st.title("Explorando la tabla pitagórica")
+st.title("Buscando relaciones entre productos")
 
 st.write(
     """
-En la tabla pitagórica hay muchas relaciones que podemos descubrir.
-
-Elegí productos, comparalos y registrá lo que vas observando.
+Elegí un producto de la tabla y usalo como punto de partida
+para anticipar otros productos relacionados.
 """
 )
 
@@ -139,49 +146,51 @@ st.divider()
 
 
 # =========================================================
-# 1. ELEGIR UNA FORMA DE EXPLORAR
+# DETERMINAR CELDAS A DESTACAR
 # =========================================================
 
-st.subheader("1. Elegí dos productos para comparar")
+celdas_destacadas = []
 
-st.write(
-    """
-Podés elegir libremente dos productos que te interese mirar.
-Si necesitás una idea para empezar, también podés elegir
-una propuesta de exploración.
-"""
-)
+if st.session_state.producto_inicial:
+    f, c = st.session_state.producto_inicial
+    celdas_destacadas.append((f, c, "inicial"))
 
-with st.expander("Ideas para explorar", expanded=False):
+if st.session_state.comprobacion:
+    f, c = st.session_state.comprobacion
+    celdas_destacadas.append((f, c, "comprobacion"))
 
-    st.radio(
-        "Elegí una propuesta:",
-        [
-            "Exploración libre",
-            "Buscá dos productos que den el mismo resultado",
-            "Buscá dos productos que tengan un número en común",
-            "Buscá dos productos donde los números aparezcan cambiados de lugar"
-        ],
-        key="orientacion"
-    )
-
-    if st.session_state.orientacion == "Exploración libre":
-        st.caption(
-            "Elegí dos productos que, por alguna razón, "
-            "te interese comparar."
-        )
-    else:
-        st.info(st.session_state.orientacion)
-
-
-# =========================================================
-# 2. TABLA INTERACTIVA
-# =========================================================
 
 tabla_estilizada = estilizar_tabla(
     tabla,
-    st.session_state.celdas_elegidas
+    celdas_destacadas
 )
+
+
+# =========================================================
+# ETAPA 1 · ELEGIR PRODUCTO
+# =========================================================
+
+if st.session_state.producto_inicial is None:
+
+    st.subheader("1. Elegí un producto")
+
+    st.write(
+        "Tocá cualquier producto de la tabla para comenzar."
+    )
+
+else:
+
+    f, c = st.session_state.producto_inicial
+    p = f * c
+
+    st.subheader("Tu producto de partida")
+
+    st.markdown(f"## {f} × {c} = {p}")
+
+
+# =========================================================
+# TABLA INTERACTIVA
+# =========================================================
 
 evento = st.dataframe(
     tabla_estilizada,
@@ -211,7 +220,7 @@ evento = st.dataframe(
 
 
 # =========================================================
-# DETECTAR CELDA SELECCIONADA
+# PROCESAR SELECCIÓN EN LA TABLA
 # =========================================================
 
 celdas_evento = evento.selection.cells
@@ -229,183 +238,268 @@ if celdas_evento:
 
         st.session_state.ultima_celda_evento = celda_actual
 
-        if celda_actual not in st.session_state.celdas_elegidas:
+        # Primera etapa: elegir producto inicial
+        if st.session_state.producto_inicial is None:
 
-            if len(st.session_state.celdas_elegidas) >= 2:
-                st.session_state.celdas_elegidas.pop(0)
+            st.session_state.producto_inicial = celda_actual
+            st.rerun()
 
-            st.session_state.celdas_elegidas.append(celda_actual)
+        # Etapa de comprobación
+        elif st.session_state.anticipacion_guardada:
 
-        st.rerun()
+            st.session_state.comprobacion = celda_actual
+            st.rerun()
 
 else:
     st.session_state.ultima_celda_evento = None
 
 
 # =========================================================
-# 3. PRODUCTOS ELEGIDOS
+# ETAPA 2 · ELEGIR RELACIÓN
 # =========================================================
 
-celdas = st.session_state.celdas_elegidas
+if (
+    st.session_state.producto_inicial is not None
+    and not st.session_state.anticipacion_guardada
+):
 
-st.markdown("### Productos que elegiste")
+    f, c = st.session_state.producto_inicial
+    producto = f * c
 
-if len(celdas) == 0:
+    st.divider()
 
-    st.caption("Todavía no elegiste ningún producto.")
+    st.subheader("2. Elegí qué querés buscar")
 
-else:
-
-    columnas = st.columns(len(celdas))
-
-    for indice, (fila, columna) in enumerate(celdas):
-
-        producto = fila * columna
-
-        with columnas[indice]:
-            with st.container(border=True):
-                st.markdown(
-                    f"### {fila} × {columna} = {producto}"
-                )
-
-
-# =========================================================
-# 4. REGISTRAR LO OBSERVADO
-# =========================================================
-
-if len(celdas) == 1:
-
-    st.info("Elegí otro producto para compararlos.")
-
-
-elif len(celdas) == 2:
-
-    st.subheader("2. ¿Qué observás?")
-
-    st.write(
-        """
-Mirá los dos productos que elegiste.
-¿Qué relación encontrás entre ellos?
-"""
+    relacion = st.radio(
+        "A partir de este producto, quiero encontrar...",
+        [
+            "otro producto que dé lo mismo",
+            "un producto que dé el doble"
+        ],
+        index=None,
+        key="relacion"
     )
 
-    st.text_area(
-        "Escribí lo que observás:",
-        key="observacion_actual",
-        placeholder=(
-            "Podés escribir algo que tengan en común, "
-            "algo que cambie o cualquier relación que hayas encontrado..."
-        ),
-        height=100
-    )
+    if relacion:
 
-    col1, col2 = st.columns(2)
+        if relacion == "otro producto que dé lo mismo":
+            objetivo = producto
 
-    with col1:
-        st.button(
-            "Guardar en mi cuaderno",
-            on_click=guardar_observacion,
-            use_container_width=True,
-            disabled=not bool(
-                st.session_state.observacion_actual.strip()
+            st.info(
+                f"Buscamos otra multiplicación cuyo resultado sea "
+                f"**{objetivo}**."
             )
+
+        else:
+            objetivo = producto * 2
+
+            st.info(
+                f"El doble de {producto} es **{objetivo}**."
+            )
+
+        # =================================================
+        # ANTICIPACIÓN
+        # =================================================
+
+        st.subheader("3. Antes de buscar en la tabla...")
+
+        st.write(
+            f"¿Qué multiplicación pensás que podría dar **{objetivo}**?"
         )
 
-    with col2:
+        col1, colx, col2 = st.columns([2, 1, 2])
+
+        with col1:
+            st.number_input(
+                "Primer número",
+                min_value=1,
+                max_value=10,
+                value=None,
+                step=1,
+                key="factor_a"
+            )
+
+        with colx:
+            st.markdown(
+                "<div style='text-align:center;"
+                "padding-top:35px;font-size:1.5rem;'>×</div>",
+                unsafe_allow_html=True
+            )
+
+        with col2:
+            st.number_input(
+                "Segundo número",
+                min_value=1,
+                max_value=10,
+                value=None,
+                step=1,
+                key="factor_b"
+            )
+
+        if (
+            st.session_state.factor_a is not None
+            and st.session_state.factor_b is not None
+        ):
+
+            anticipado = (
+                st.session_state.factor_a
+                * st.session_state.factor_b
+            )
+
+            st.write(
+                f"Tu anticipación es: "
+                f"**{st.session_state.factor_a} × "
+                f"{st.session_state.factor_b} = {anticipado}**"
+            )
+
+            st.button(
+                "Ahora quiero comprobarlo",
+                on_click=guardar_anticipacion,
+                use_container_width=True
+            )
+
+    st.button(
+        "Elegir otro producto de partida",
+        on_click=cambiar_producto
+    )
+
+
+# =========================================================
+# ETAPA 4 · COMPROBAR
+# =========================================================
+
+if st.session_state.anticipacion_guardada:
+
+    f0, c0 = st.session_state.producto_inicial
+    producto0 = f0 * c0
+
+    a = st.session_state.factor_a
+    b = st.session_state.factor_b
+
+    anticipado = a * b
+
+    if st.session_state.relacion == "otro producto que dé lo mismo":
+        objetivo = producto0
+        nombre_relacion = "el mismo resultado"
+    else:
+        objetivo = producto0 * 2
+        nombre_relacion = "el doble"
+
+    st.divider()
+
+    st.subheader("4. Comprobá tu anticipación")
+
+    st.write(
+        f"Anticipaste **{a} × {b} = {anticipado}**."
+    )
+
+    st.write(
+        "Ahora buscá esa multiplicación en la tabla y tocala."
+    )
+
+    if st.session_state.comprobacion:
+
+        fc, cc = st.session_state.comprobacion
+        resultado_comprobado = fc * cc
+
+        st.markdown(
+            f"### Elegiste {fc} × {cc} = {resultado_comprobado}"
+        )
+
+        if (
+            fc == a and cc == b
+        ):
+
+            st.success(
+                "Encontraste en la tabla la multiplicación "
+                "que habías anticipado."
+            )
+
+            if resultado_comprobado == objetivo:
+
+                st.write(
+                    f"El resultado es **{objetivo}**: "
+                    f"encontraste {nombre_relacion} que buscabas."
+                )
+
+            else:
+
+                st.write(
+                    f"Esta multiplicación da **{resultado_comprobado}**, "
+                    f"pero buscábamos **{objetivo}**."
+                )
+
+                st.write(
+                    "Podés volver a pensar tu anticipación "
+                    "y probar con otros números."
+                )
+
+        else:
+
+            st.info(
+                f"Habías anticipado **{a} × {b}**. "
+                f"En la tabla elegiste **{fc} × {cc}**."
+            )
+
+            st.write(
+                "Podés buscar la multiplicación que anticipaste "
+                "o explorar si esta nueva elección también sirve."
+            )
+
         st.button(
-            "Elegir otros productos",
-            on_click=limpiar_seleccion,
+            "Guardar esta exploración",
+            on_click=guardar_resultado,
             use_container_width=True
         )
 
 
 # =========================================================
-# 5. CUADERNO DE EXPLORACIÓN
+# CUADERNO
 # =========================================================
 
-if st.session_state.registro_exploracion:
+if st.session_state.registro:
 
     st.divider()
 
-    st.subheader("3. Mi cuaderno de exploración")
-
-    st.write(
-        """
-Acá quedan guardados los productos que comparaste
-y lo que observaste en cada caso.
-"""
-    )
+    st.subheader("Mis exploraciones")
 
     for numero, registro in enumerate(
-        st.session_state.registro_exploracion
+        st.session_state.registro,
+        start=1
     ):
 
-        f1, c1 = registro["celda1"]
-        f2, c2 = registro["celda2"]
+        f0, c0 = registro["inicial"]
+        producto0 = f0 * c0
 
-        p1 = registro["producto1"]
-        p2 = registro["producto2"]
+        a, b = registro["anticipacion"]
+
+        fc, cc = registro["comprobacion"]
 
         with st.container(border=True):
 
-            st.caption(f"Exploración {numero + 1}")
+            st.caption(f"Exploración {numero}")
 
-            st.markdown(
-                f"### {f1} × {c1} = {p1}  ↔  "
-                f"{f2} × {c2} = {p2}"
+            st.write(
+                f"**Partí de:** "
+                f"{f0} × {c0} = {producto0}"
             )
 
-            st.write(registro["observacion"])
+            st.write(
+                f"**Busqué:** {registro['relacion']}"
+            )
 
-            if registro["orientacion"] != "Exploración libre":
-                st.caption(
-                    "Propuesta usada: "
-                    + registro["orientacion"]
-                )
+            st.write(
+                f"**Anticipé:** {a} × {b} = {a*b}"
+            )
 
-            col_ver, col_borrar = st.columns([3, 1])
-
-            with col_ver:
-                st.button(
-                    "Volver a mirar estos productos",
-                    key=f"volver_{numero}",
-                    on_click=volver_a_caso,
-                    args=(numero,),
-                    use_container_width=True
-                )
-
-            with col_borrar:
-                st.button(
-                    "Borrar",
-                    key=f"borrar_{numero}",
-                    on_click=borrar_registro,
-                    args=(numero,),
-                    use_container_width=True
-                )
+            st.write(
+                f"**Comprobé en la tabla:** "
+                f"{fc} × {cc} = {fc*cc}"
+            )
 
 
 # =========================================================
-# CIERRE ABIERTO
-# =========================================================
-
-if len(st.session_state.registro_exploracion) >= 2:
-
-    st.divider()
-
-    st.subheader("Para seguir mirando")
-
-    st.write(
-        """
-Tu cuaderno ya tiene varias exploraciones.
-
-Podés volver a cualquiera de ellas, comparar lo que observaste
-o elegir nuevos productos de la tabla.
-"""
-    )
-
-
-# =========================================================
-# REINICIAR
+# REINICIO
 # =========================================================
 
 st.divider()
@@ -416,10 +510,6 @@ st.button(
 )
 
 st.caption(
-    "TP-01 · Explorando la tabla pitagórica · "
-    "LIM – Laboratorio de Ideas Matemáticas · v0.5"
-)
-st.caption(
-    "TP-01 · Mirar la tabla de otra manera · "
-    "LIM – Laboratorio de Ideas Matemáticas"
+    "TP-01 · Buscando relaciones entre productos · "
+    "LIM – Laboratorio de Ideas Matemáticas · v0.6"
 )
