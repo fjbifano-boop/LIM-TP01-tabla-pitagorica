@@ -417,9 +417,7 @@ if st.session_state.registro_exploracion:
     st.subheader("2. Mi exploración")
 
     st.write(
-        """
-Estas son algunas de las relaciones que fuiste encontrando.
-"""
+        "Estas son algunas de las relaciones que fuiste encontrando."
     )
 
     for numero, registro in enumerate(
@@ -435,41 +433,24 @@ Estas son algunas de las relaciones que fuiste encontrando.
 
         observacion = registro["observacion"]
 
-        st.markdown(
-            f"""
-            <div style="
-                border:1px solid rgba(128,128,128,.30);
-                border-radius:12px;
-                padding:16px;
-                margin-bottom:12px;
-            ">
-                <div style="
-                    font-size:.9rem;
-                    opacity:.7;
-                    margin-bottom:6px;
-                ">
-                    Observación {numero}
-                </div>
+        with st.container(border=True):
 
-                <div style="
-                    font-size:1.1rem;
-                    font-weight:700;
-                    margin-bottom:8px;
-                ">
-                    {f1} × {c1} = {p1}
-                    &nbsp;&nbsp; ↔ &nbsp;&nbsp;
-                    {f2} × {c2} = {p2}
-                </div>
+            st.caption(f"Observación {numero}")
 
-                <div style="font-size:1rem;">
-                    “{observacion}”
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True
+            st.markdown(
+                f"### {f1} × {c1} = {p1}  ↔  {f2} × {c2} = {p2}"
+            )
+
+            st.write(observacion)
+
+    # Pregunta después de varias exploraciones
+    if len(st.session_state.registro_exploracion) >= 2:
+
+        st.info(
+            "Mirá las observaciones que guardaste. "
+            "**¿Hay alguna relación que te gustaría probar "
+            "con otros productos de la tabla?**"
         )
-
-
     # -----------------------------------------------------
     # Pregunta después de varias exploraciones
     # -----------------------------------------------------
